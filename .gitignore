@@ -8,6 +8,7 @@ __pycache__/
 
 # ---- 运行产物与日志 ----
 output/
+dist/
 launcher.log
 engine.log
 cli-help.txt

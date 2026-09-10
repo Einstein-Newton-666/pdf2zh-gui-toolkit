@@ -1,8 +1,13 @@
 # pdf2zh GUI Toolkit（Windows 双击即用）
 
+[![checks](https://github.com/Einstein-Newton-666/pdf2zh-gui-toolkit/actions/workflows/checks.yml/badge.svg)](https://github.com/Einstein-Newton-666/pdf2zh-gui-toolkit/actions/workflows/checks.yml)
+[![release](https://img.shields.io/github/v/release/Einstein-Newton-666/pdf2zh-gui-toolkit?label=release)](https://github.com/Einstein-Newton-666/pdf2zh-gui-toolkit/releases)
+[![license](https://img.shields.io/github/license/Einstein-Newton-666/pdf2zh-gui-toolkit)](LICENSE)
+
 把 [PDFMathTranslate-next](https://github.com/PDFMathTranslate/PDFMathTranslate-next)（`pdf2zh_next` + [BabelDOC](https://github.com/funstory-ai/BabelDOC)）包装成 **Windows 上双击就能用的图形界面**，并配批量脚本、界面汉化和几个踩坑补丁。
 
 > 这不是官方项目，只是个人用的封装层：**引擎本身原样安装到 `.venv`，本仓库不含上游代码**。
+> 想直接下载成品：见 [Releases](https://github.com/Einstein-Newton-666/pdf2zh-gui-toolkit/releases)（zip 只含脚本与文档，引擎仍需按下面第 2 步安装）。
 
 ---
 
@@ -90,6 +95,34 @@ label=field.description        # ← 149 处英文描述就是这么显示出来
 ```
 
 > ⚠️ `uv pip install --upgrade pdf2zh-next` 会覆盖 `.venv` 里的这两个文件，**升级后重跑一次即可**。
+
+---
+
+## 打包与发布
+
+```powershell
+.\打包发布.ps1                      # 只生成 dist\pdf2zh-gui-toolkit-<日期>.zip
+.\打包发布.ps1 -Tag v1.0.0 -Push    # 打 zip + 建标签推送 → GitHub Actions 自动发 Release
+```
+
+打包用的是 `git archive`，**只收 git 跟踪的文件**，所以 `.venv`、`.uv-cache`、`output/`、
+`gui-auth.txt` 这些天然进不去（脚本还会先检查工作区是否干净）。
+
+打 `v*` 标签后 `.github/workflows/release.yml` 会构建 zip 并创建 Release，
+Release 说明用 `.github/release-notes.md`（中文）。
+
+## CI 检查（`.github/workflows/checks.yml`）
+
+本仓库把踩过的两个"改文件就炸"的坑钉成了自动化检查，每次 push / PR 都会跑：
+
+| 检查 | 为什么 |
+|---|---|
+| 所有 `.cmd` 必须是**纯 ASCII** | cmd.exe 按控制台代码页（GBK）读 .cmd，写中文会让脚本名变乱码 → 双击没反应 |
+| 所有 `.ps1` 必须**带 UTF-8 BOM** | Windows PowerShell 5.1 会把无 BOM 文件按 GBK 解码 → 中文乱码 + 语法错误 |
+| PowerShell 语法解析 | 防止合并出语法错误 |
+| `apply-cn-labels.py` 编译 + 对照表自检 | 保证对照表条目数正常、每条译文确实含中文 |
+| 密钥扫描 | 防止 `sk-...` / `ghp_...` / 私钥被误提交 |
+| 环境目录未入库 | `.venv`/`output`/`gui-auth.txt` 等不应出现在版本库里 |
 
 ---
 

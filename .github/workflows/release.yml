@@ -1,0 +1,38 @@
+name: release
+
+# 打一个 v* 标签即可自动打包并发布：
+#   git tag v1.0.0 && git push origin v1.0.0
+# 打包用 git archive，只会收进 git 跟踪的文件 —— 天然排除 .venv / 缓存 / 产物 / 凭据。
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 生成 zip
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          mkdir -p dist
+          git archive --format=zip --prefix="pdf2zh-gui-toolkit-${TAG}/" -o "dist/pdf2zh-gui-toolkit-${TAG}.zip" HEAD
+          echo "包含的文件：" && unzip -l "dist/pdf2zh-gui-toolkit-${TAG}.zip" | tail -n +4 | head -n -2
+
+      - name: 创建 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" dist/*.zip \
+            --title "$TAG" \
+            --notes-file .github/release-notes.md

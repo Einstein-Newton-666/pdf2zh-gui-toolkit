@@ -1,0 +1,123 @@
+name: checks
+
+# 这个仓库踩过两个"改文件就炸"的坑，所以用 CI 把它们钉死：
+#   1) .cmd 里出现中文 → cmd.exe 按控制台代码页(GBK)读取，脚本名变乱码，双击没反应
+#   2) .ps1 存成无 BOM 的 UTF-8 → Windows PowerShell 5.1 按 GBK 解码，中文乱码 + 语法错误
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 让 git 正确输出中文文件名
+        run: git config core.quotepath false
+
+      - name: .cmd 必须是纯 ASCII
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            if LC_ALL=C grep -qP '[^\x00-\x7F]' "$f"; then
+              echo "::error file=$f::.cmd 含非 ASCII 字符。cmd.exe 按控制台代码页(GBK)读取 .cmd，中文会让脚本名变成乱码导致找不到文件；中文提示请写进 .ps1。"
+              fail=1
+            else
+              echo "OK   $f"
+            fi
+          done < <(git ls-files -z '*.cmd')
+          exit $fail
+
+      - name: .ps1 必须是 UTF-8 带 BOM
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            bom=$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')
+            if [ "$bom" != "efbbbf" ]; then
+              echo "::error file=$f::.ps1 缺少 UTF-8 BOM。Windows PowerShell 5.1 会把无 BOM 文件按 GBK 解码，导致中文乱码和语法错误。"
+              fail=1
+            else
+              echo "OK   $f"
+            fi
+          done < <(git ls-files -z '*.ps1')
+          exit $fail
+
+      - name: PowerShell 语法解析
+        shell: pwsh
+        run: |
+          git config core.quotepath false
+          $bad = 0
+          foreach ($f in (git ls-files '*.ps1')) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f).Path, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Host "::error file=$f::$($errors[0].Message) (line $($errors[0].Extent.StartLineNumber))"
+              $bad = 1
+            } else {
+              Write-Host "OK   $f"
+            }
+          }
+          if ($bad) { exit 1 }
+
+      - name: Python 语法 + 汉化对照表自检
+        run: |
+          python3 -m py_compile apply-cn-labels.py
+          python3 - <<'PY'
+          import ast, pathlib, sys
+
+          src = pathlib.Path('apply-cn-labels.py').read_text(encoding='utf-8')
+          tree = ast.parse(src)
+          cn = extra = None
+          for node in tree.body:
+              if isinstance(node, ast.Assign):
+                  name = getattr(node.targets[0], 'id', '')
+                  if name == 'CN':
+                      cn = ast.literal_eval(node.value)
+                  elif name == 'EXTRA_UI':
+                      extra = ast.literal_eval(node.value)
+
+          problems = []
+          if not cn or len(cn) < 130:
+              problems.append(f'CN 对照表条目过少：{len(cn) if cn else 0}')
+          if not extra or len(extra) < 5:
+              problems.append(f'EXTRA_UI 条目过少：{len(extra) if extra else 0}')
+          for table, label in ((cn or {}, 'CN'), (extra or {}, 'EXTRA_UI')):
+              for k, v in table.items():
+                  if not any('\u4e00' <= c <= '\u9fff' for c in v):
+                      problems.append(f'{label} 的译文没有中文：{k!r} -> {v!r}')
+          if 'description="' not in src:
+              problems.append('脚本里找不到 description=" 替换逻辑')
+
+          if problems:
+              for p in problems:
+                  print(f'::error::{p}')
+              sys.exit(1)
+          print(f'OK   CN 对照表 {len(cn)} 条，EXTRA_UI {len(extra)} 条')
+          PY
+
+      - name: 防止误提交密钥
+        run: |
+          if git grep -n -I -E 'sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|BEGIN [A-Z ]*PRIVATE KEY' -- . ; then
+            echo "::error::检测到疑似密钥/token，请从历史中移除后再提交"
+            exit 1
+          fi
+          echo "OK   未发现疑似密钥"
+
+      - name: 确认环境目录与凭据没有入库
+        run: |
+          fail=0
+          if git ls-files | grep -E '^(\.venv|\.uv-cache|\.edge-profile|\.gradio|output|dist)/' ; then
+            echo "::error::环境目录/产物目录不应入库（见 .gitignore）"
+            fail=1
+          fi
+          for f in gui-auth.txt launcher.log engine.log; do
+            if git ls-files --error-unmatch "$f" >/dev/null 2>&1 ; then
+              echo "::error::$f 不应入库（凭据/日志）"
+              fail=1
+            fi
+          done
+          [ $fail -eq 0 ] && echo "OK   环境目录与凭据均未入库"
+          exit $fail

@@ -1,0 +1,23 @@
+# ---- 运行环境（体积巨大，绝不入库）----
+.venv/
+.uv-cache/
+.edge-profile/
+.gradio/
+__pycache__/
+*.py[cod]
+
+# ---- 运行产物与日志 ----
+output/
+launcher.log
+engine.log
+cli-help.txt
+
+# ---- 凭据：绝对不要提交 ----
+gui-auth.txt
+*.orig-en.bak
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

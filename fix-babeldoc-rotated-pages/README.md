@@ -74,8 +74,10 @@ ctm_for_ops = (1, 0, 0, 1, -page_crop_box.x, -page_crop_box.y)
 | 单语页可提取文本行数 | **15** | **91**（原文也是 91） |
 | 中文文本 | 8 字（图注） | 8 字（图注） |
 
-修复前后渲染对比见 `before-mono-p147.png`（坏）与 `after-mono-p147.png`（好），
-`before-dual-p147.png` / `after-dual-p147.png` 是对照版的前后对比。
+修复前后的渲染对比图（`before-*.png` / `after-*.png`）**只保留在本机**，
+没有跟进这个公开仓库——它们是论文页面的截图，含 Figure 与表格内容。
+本机路径：`D:\研究生\pdf2zh\fix-babeldoc-rotated-pages\`。
+上面的表格已经把所有可量化的判据列全，不看图也能独立验证。
 
 ## 四之二、真实论文（Asek 209 页）复跑验证
 

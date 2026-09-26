@@ -13,6 +13,11 @@ launcher.log
 engine.log
 cli-help.txt
 
+# ---- 引擎工作目录与临时文件 ----
+# 里面有论文原文/译文与逐页渲染图，属于受版权保护的内容，只留在本机
+pdf2zh_files/
+tmp/
+
 # ---- 凭据：绝对不要提交 ----
 gui-auth.txt
 *.orig-en.bak
